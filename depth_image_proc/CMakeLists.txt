@@ -29,6 +29,7 @@ add_library(${PROJECT_NAME} src/nodelets/convert_metric.cpp
                              src/nodelets/point_cloud_xyz_radial.cpp
                              src/nodelets/point_cloud_xyzi_radial.cpp
                              src/nodelets/register.cpp
+			     src/nodelets/single_point.cpp
 )
 target_link_libraries(${PROJECT_NAME} ${catkin_LIBRARIES} ${OpenCV_LIBRARIES})
 
