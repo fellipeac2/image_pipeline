@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 2.8)
 project(depth_image_proc)
 
-find_package(catkin REQUIRED cmake_modules cv_bridge eigen_conversions image_geometry image_transport message_filters nodelet sensor_msgs stereo_msgs tf2 tf2_ros)
+find_package(catkin REQUIRED cmake_modules cv_bridge eigen_conversions image_geometry image_transport message_filters nodelet sensor_msgs stereo_msgs tf2 tf2_ros geometry_msgs message_generation)
 
 if(cv_bridge_VERSION VERSION_GREATER "1.12.0")
   add_compile_options(-std=c++11)
@@ -32,6 +32,11 @@ add_library(${PROJECT_NAME} src/nodelets/convert_metric.cpp
 			     src/nodelets/single_point.cpp
 )
 target_link_libraries(${PROJECT_NAME} ${catkin_LIBRARIES} ${OpenCV_LIBRARIES})
+
+add_service_files(
+  FILES
+  GetPointStamped.srv
+)
 
 install(DIRECTORY include/${PROJECT_NAME}/
     DESTINATION ${CATKIN_PACKAGE_INCLUDE_DESTINATION}

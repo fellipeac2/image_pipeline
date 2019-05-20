@@ -70,28 +70,37 @@ void SinglePointNodelet::connectCb()
 void SinglePointNodelet::depthCb(const sensor_msgs::ImageConstPtr& depth_msg, const sensor_msgs::CameraInfoConstPtr& info_msg)
 {
 	Point::Ptr point_msg(new Point);
+	point_msg->header = depth_msg->header;
+//	point_msg.header.frame_id = "human_frame";
 	
 	model_.fromCameraInfo(info_msg);
 	if(u_raw_ < 0 || v_raw_ < 0)
 		return;
-	int u = (int)(u_raw_ * depth_msg->width);
-	int v = (int)(v_raw_ * depth_msg->height);
+	int u = (int)(u_raw_ * depth_msg->width + 0.5);
+	int v = (int)(v_raw_ * depth_msg->height + 0.5);
 	
+  	typedef float T;
+	if (depth_msg->encoding == enc::TYPE_32FC1)
+	{
+		ROS_INFO("float");
+	} else if(depth_msg->encoding == enc::TYPE_16UC1)
+	{
+		ROS_INFO("uint16");
+	} else	
+			{
+		return;
+	}
 	float center_x = model_.cx();
 	float center_y = model_.cy();
 
 	// Combine unit conversion (if necessary) with scaling by focal length for computing (X,Y)
-	double unit_scaling = DepthTraits<float>::toMeters( float(1) );
+	double unit_scaling = DepthTraits<T>::toMeters( T(1) );
 	float constant_x = unit_scaling / model_.fx();
 	float constant_y = unit_scaling / model_.fy();
 	float bad_point = std::numeric_limits<float>::quiet_NaN();
-	typedef uint16_t T;
-  	if (depth_msg->encoding == enc::TYPE_32FC1)
-	{
-		typedef float T;
-	}	
 	const T* depth_row = reinterpret_cast<const T*>(&depth_msg->data[0]);
   	int row_step = depth_msg->step / sizeof(T);
+	depth_row += row_step * v;
 	T depth = depth_row[u];
 	
 	float x, y, z;
@@ -116,8 +125,12 @@ void SinglePointNodelet::depthCb(const sensor_msgs::ImageConstPtr& depth_msg, co
 		z = DepthTraits<T>::toMeters(depth);
 	}
 	char buffer[50];
-	sprintf(buffer, "(X, Y, Z) : (%f, %f, %f)", x, y, z);
+	sprintf(buffer, "(X, Y, Z) : (%f, %f, %f)",x, y, z);
 	ROS_INFO(buffer);
+	point_msg->point.x = x;
+	point_msg->point.y = y;
+	point_msg->point.z = z;
+		pub_point_.publish(point_msg);
 }
 
 void SinglePointNodelet::partCb(const std_msgs::Float32MultiArray::ConstPtr& part)

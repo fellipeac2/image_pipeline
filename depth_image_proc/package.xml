@@ -36,6 +36,9 @@
   <build_depend>stereo_msgs</build_depend>
   <build_depend>tf2</build_depend>
   <build_depend>tf2_ros</build_depend>
+  <build_depend>geometry_msgs</build_depend>
+  <build_depend>message_generation</build_depend>
+
 
   <run_depend>boost</run_depend>
   <run_depend>cv_bridge</run_depend>
@@ -45,4 +48,5 @@
   <run_depend>nodelet</run_depend>
   <run_depend>tf2</run_depend>
   <run_depend>tf2_ros</run_depend>
+  <run_depend>message_runtime</run_depend>
 </package>
