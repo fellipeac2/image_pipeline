@@ -9,6 +9,7 @@
 #include <std_msgs/Float32MultiArray.h>
 
 #include <depth_image_proc/depth_traits.h>
+#include <depth_image_proc/GetPointStamped.h>
 
 namespace depth_image_proc {
 
@@ -22,9 +23,12 @@ class SinglePointNodelet : public nodelet::Nodelet
 
 	boost::mutex connect_mutex_;
 	typedef geometry_msgs::PointStamped Point;
-	ros::Publisher pub_point_;
 
 	image_geometry::PinholeCameraModel model_;
+
+	ros::ServiceServer service_;
+	sensor_msgs::ImageConstPtr depth_msg_;
+	sensor_msgs::CameraInfoConstPtr info_msg_;
 
 	float u_raw_ = -1;
 	float v_raw_ = -1;
@@ -37,6 +41,9 @@ class SinglePointNodelet : public nodelet::Nodelet
 		     const sensor_msgs::CameraInfoConstPtr& info_msg);
 
 	void partCb(const std_msgs::Float32MultiArray::ConstPtr& part);
+
+	bool get_point_stamped(depth_image_proc::GetPointStamped::Request &req,
+			       depth_image_proc::GetPointStamped::Response &res);
 };
 
 void SinglePointNodelet::onInit()
@@ -49,47 +56,44 @@ void SinglePointNodelet::onInit()
 	ros::SubscriberStatusCallback connect_cb = boost::bind(&SinglePointNodelet::connectCb, this);
 
 	boost::lock_guard<boost::mutex> lock(connect_mutex_);
-	pub_point_ = nh.advertise<Point>("point", 1, connect_cb, connect_cb);
-	part_sub_ = nh.subscribe("/part", 10, &SinglePointNodelet::partCb, this);
+	service_ = nh.advertiseService("get_point_stamped", &SinglePointNodelet::get_point_stamped, this);
 }
 
 void SinglePointNodelet::connectCb()
 {
 	boost::lock_guard<boost::mutex> lock(connect_mutex_);
 
-	if(pub_point_.getNumSubscribers() == 0)
+	/*if(pub_point_.getNumSubscribers() == 0)
 	{
 		sub_depth_.shutdown();
 	} else if (!sub_depth_)
-	{
+	{*/
 		image_transport::TransportHints hints("raw", ros::TransportHints(), getPrivateNodeHandle());
 		sub_depth_ = it_->subscribeCamera("image_rect", queue_size_, &SinglePointNodelet::depthCb, this, hints);
-	}
+//	}
 }
+
+
 
 void SinglePointNodelet::depthCb(const sensor_msgs::ImageConstPtr& depth_msg, const sensor_msgs::CameraInfoConstPtr& info_msg)
 {
-	Point::Ptr point_msg(new Point);
-	point_msg->header = depth_msg->header;
+	depth_msg_ = depth_msg;
+	info_msg_  = info_msg;
+}
+bool SinglePointNodelet::get_point_stamped(depth_image_proc::GetPointStamped::Request &req,
+			       depth_image_proc::GetPointStamped::Response &res)
+{
+
+	res.result.header = depth_msg_->header;
 //	point_msg.header.frame_id = "human_frame";
 	
-	model_.fromCameraInfo(info_msg);
-	if(u_raw_ < 0 || v_raw_ < 0)
-		return;
-	int u = (int)(u_raw_ * depth_msg->width + 0.5);
-	int v = (int)(v_raw_ * depth_msg->height + 0.5);
+	model_.fromCameraInfo(info_msg_);
+	if(req.u < 0 || req.v < 0)
+		return false;
+	int u = (int)(req.u * depth_msg_->width + 0.5);
+	int v = (int)(req.v * depth_msg_->height + 0.5);
 	
   	typedef float T;
-	if (depth_msg->encoding == enc::TYPE_32FC1)
-	{
-		ROS_INFO("float");
-	} else if(depth_msg->encoding == enc::TYPE_16UC1)
-	{
-		ROS_INFO("uint16");
-	} else	
-			{
-		return;
-	}
 	float center_x = model_.cx();
 	float center_y = model_.cy();
 
@@ -98,8 +102,8 @@ void SinglePointNodelet::depthCb(const sensor_msgs::ImageConstPtr& depth_msg, co
 	float constant_x = unit_scaling / model_.fx();
 	float constant_y = unit_scaling / model_.fy();
 	float bad_point = std::numeric_limits<float>::quiet_NaN();
-	const T* depth_row = reinterpret_cast<const T*>(&depth_msg->data[0]);
-  	int row_step = depth_msg->step / sizeof(T);
+	const T* depth_row = reinterpret_cast<const T*>(&depth_msg_->data[0]);
+  	int row_step = depth_msg_->step / sizeof(T);
 	depth_row += row_step * v;
 	T depth = depth_row[u];
 	
@@ -124,20 +128,12 @@ void SinglePointNodelet::depthCb(const sensor_msgs::ImageConstPtr& depth_msg, co
 		y = (v - center_y) * depth * constant_y;
 		z = DepthTraits<T>::toMeters(depth);
 	}
-	char buffer[50];
-	sprintf(buffer, "(X, Y, Z) : (%f, %f, %f)",x, y, z);
-	ROS_INFO(buffer);
-	point_msg->point.x = x;
-	point_msg->point.y = y;
-	point_msg->point.z = z;
-		pub_point_.publish(point_msg);
+	res.result.point.x = x;
+	res.result.point.y = y;
+	res.result.point.z = z;
+	return true;
 }
 
-void SinglePointNodelet::partCb(const std_msgs::Float32MultiArray::ConstPtr& part)
-{
-	u_raw_ = part->data[0];
-	v_raw_ = part->data[1];
-}
 
 }
 #include <pluginlib/class_list_macros.h>

@@ -7,6 +7,11 @@ if(cv_bridge_VERSION VERSION_GREATER "1.12.0")
   add_compile_options(-std=c++11)
 endif()
 
+add_service_files(
+  FILES
+  GetPointStamped.srv
+)
+generate_messages(DEPENDENCIES std_msgs geometry_msgs)
 catkin_package(
     INCLUDE_DIRS include
     LIBRARIES ${PROJECT_NAME})
@@ -29,14 +34,11 @@ add_library(${PROJECT_NAME} src/nodelets/convert_metric.cpp
                              src/nodelets/point_cloud_xyz_radial.cpp
                              src/nodelets/point_cloud_xyzi_radial.cpp
                              src/nodelets/register.cpp
-			     src/nodelets/single_point.cpp
+			      src/nodelets/single_point.cpp
 )
+add_dependencies(${PROJECT_NAME} ${${PROJECT_NAME}_EXPORTED_TARGETS})
 target_link_libraries(${PROJECT_NAME} ${catkin_LIBRARIES} ${OpenCV_LIBRARIES})
 
-add_service_files(
-  FILES
-  GetPointStamped.srv
-)
 
 install(DIRECTORY include/${PROJECT_NAME}/
     DESTINATION ${CATKIN_PACKAGE_INCLUDE_DESTINATION}
